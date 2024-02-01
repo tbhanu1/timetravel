@@ -1,0 +1,74 @@
+- Database: InsuranceRecords 
+- The first 4 tables define config tables that lets admins define the 
+- various entities the systen should support and what fields should 
+- be supported by respective entities
+- -------------------------------------------
+- #Table to define entities supported by the system
+      - Entity 
+          - EntityId
+          - EntityName
+          - EntityType
+- Many Fields belonging to entities are standalone fields. This table 
+- lets users define the fields the Entities can have
+      - EntityFields
+          - FieldId
+          - EntityId
+          - FieldName
+          - FieldType
+          -  isMandatory
+- The GroupFields supported for a given entity-type. For e.g. RestaurantOwner can represent
+- a Group of fields under which different individual fields like 1. OwnerFirstName 2. LastName etc can be listed
+  - EntityGroupFields
+  - EntityGroupId
+  - EntityGroupName
+  - EntityId
+  - IsMandatory
+  - MultipleAllowed
+- The individual fields within a GroupField e.g FirstName, LastName etc.
+      - EntityGroupFields
+          - GroupFieldId
+          - EntityGroupId
+          - GroupFieldName
+          - GroupFieldType
+- -------------------------------------------------
+The following tables define the actual instances of the Entities defines
+in the config tables above. 
+- --------------------------------------------------
+- This table contains the actual instances of the entities defined in the 
+- Entity table
+      - EntityInstance
+          - EntityInstanceId
+          - EntityId
+          - Created
+          - Updated
+          - Status
+- Each row of this table represents a Version of a row in the EntityInstance 
+- Each Version row represents the dates during which that EntityInstance was active
+- In case a Version field needs to be negated before it's planned end date, the "replacedDate"
+- and replacedByInstance fields below are used.
+      - EntityVersions
+          - VersionId
+          - EntityInstanceId
+          - StartDate
+          - EndDate
+          - ReplacedDate
+          - ReplacedByEntityVersionId
+
+- For each EntityVersion row, the various Fields with respective values 
+      - EntityVersionFields
+          - FieldInstanceId
+          - EntityVersionId
+          - FieldId
+          - FieldValue
+
+- For each EntityVersion row, the GroupField instances belonging to the Version row
+      - EntityVersionGroupFields
+        - GroupFieldInstanceId
+        - EntityVersionId
+
+- For each EntityVersion row, the various individual fields belonging to a given GroupFieldInstance
+      - EntityVersionGroupFields
+          - GroupFieldInstanceId
+          - EntityVersionId
+          - FieldId
+          - FieldValue
