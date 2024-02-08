@@ -1,8 +1,9 @@
 package entity
 
 type Record struct {
-	ID   int               `json:"id"`
-	Data map[string]string `json:"data"`
+	ID        int `json:"id"`
+	VersionID int64
+	Data      map[string]string `json:"data"`
 }
 
 func (d *Record) Copy() Record {
