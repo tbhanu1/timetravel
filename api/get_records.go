@@ -52,7 +52,7 @@ func (a *API) GetRecords2(w http.ResponseWriter, r *http.Request) {
 		//Get a specific version for the id
 		record, err := a.records.GetVersionedRecord(ctx, int(idNumber), versionIdNum)
 		if err != nil {
-			err := writeError(w, fmt.Sprintf("record of id %v does not exist", idNumber), http.StatusBadRequest)
+			err := writeError(w, err.Error(), http.StatusBadRequest)
 			logError(err)
 			return
 		}

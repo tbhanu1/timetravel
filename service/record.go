@@ -16,6 +16,7 @@ import (
 var ErrRecordDoesNotExist = errors.New("record with that id does not exist")
 var ErrRecordIDInvalid = errors.New("record id must >= 0")
 var ErrRecordAlreadyExists = errors.New("record already exists")
+var ErrRecordVersionIdDoesNotExist = errors.New("versionId with id for record id does not exist")
 
 // Implements method to get, create, and update record data.
 type RecordService interface {
@@ -120,6 +121,20 @@ func (s *RepositoryRecordService) GetVersionIdsForRecord(ctx context.Context, id
 }
 
 func (s *RepositoryRecordService) GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error) {
+	versionIds, err := getVersionIdsForRecord(s.db, id)
+	if err != nil {
+		return entity.Record{}, err
+	}
+	var idxFound = len(versionIds)
+	for index, element := range versionIds {
+		if element == versionId {
+			idxFound = index
+			break
+		}
+	}
+	if idxFound == len(versionIds) {
+		return entity.Record{}, ErrRecordVersionIdDoesNotExist
+	}
 	return getSpecifiedVersionForRecord(s.db, id, versionId)
 }
 
@@ -239,7 +254,7 @@ func getSpecifiedVersionForRecord(db *sql.DB, id int, versionId int64) (entity.R
 
 	record.ID = id
 	record.VersionID = versionId
-	rows, err := db.Query("SELECT key, value FROM recordVersionField WHERE fieldVersionId = ?", versionId)
+	rows, err := db.Query("SELECT key, value FROM recordVersionField  WHERE fieldVersionId = ?", versionId)
 	if err != nil {
 		return record, err
 	}
