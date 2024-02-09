@@ -22,5 +22,6 @@ func (a *API) CreateRoutes(routes *mux.Router) {
 func (a *API) CreateRoutes2(routes *mux.Router) {
 	routes.Path("/records/{id}").HandlerFunc(a.GetRecords2).Methods("GET")
 	routes.Path("/records/{id}/{versionId}").HandlerFunc(a.GetRecords2).Methods("GET")
+	routes.Path("/recordVersions/{id}").HandlerFunc(a.GetVersionIdsForRecord).Methods("GET")
 	routes.Path("/records/{id}").HandlerFunc(a.PostRecords2).Methods("POST")
 }

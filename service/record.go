@@ -23,8 +23,10 @@ type RecordService interface {
 	// GetRecord will retrieve an record.
 	GetRecord(ctx context.Context, id int) (entity.Record, error)
 
-	// GetRecord will retrieve an record.
+	// GetVersionedRecord will retrieve an record with a specific version.
 	GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error)
+
+	GetVersionIdsForRecord(ctx context.Context, id int) ([]int64, error)
 
 	// CreateRecord will insert a new record.
 	//
@@ -74,6 +76,10 @@ func (s *InMemoryRecordService) GetVersionedRecord(ctx context.Context, id int) 
 	return entity.Record{}, nil
 }
 
+func (s *InMemoryRecordService) GetVersionIdsForRecord(ctx context.Context, id int) ([]int64, error) {
+	return nil, nil
+}
+
 func (s *InMemoryRecordService) CreateRecord(ctx context.Context, record entity.Record) error {
 	id := record.ID
 	if id <= 0 {
@@ -108,6 +114,10 @@ func (s *InMemoryRecordService) UpdateRecord(ctx context.Context, id int, update
 
 func (s *RepositoryRecordService) GetRecord(ctx context.Context, id int) (entity.Record, error) {
 	return getLatestVersionForRecord(s.db, id)
+}
+
+func (s *RepositoryRecordService) GetVersionIdsForRecord(ctx context.Context, id int) ([]int64, error) {
+	return getVersionIdsForRecord(s.db, id)
 }
 
 func (s *RepositoryRecordService) GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error) {
@@ -251,4 +261,26 @@ func getSpecifiedVersionForRecord(db *sql.DB, id int, versionId int64) (entity.R
 		return record, err
 	}
 	return record, nil
+}
+
+func getVersionIdsForRecord(db *sql.DB, id int) ([]int64, error) {
+	rows, err := db.Query("SELECT versionId FROM recordVersion WHERE recordId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	versionIds := []int64{}
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var verId int64
+		if err := rows.Scan(&verId); err != nil {
+
+			return versionIds, err
+		}
+		versionIds = append(versionIds, verId)
+	}
+	if err = rows.Err(); err != nil {
+		return versionIds, err
+	}
+	return versionIds, nil
 }
