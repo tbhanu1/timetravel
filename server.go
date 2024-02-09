@@ -23,26 +23,27 @@ func logError(err error) {
 func main() {
 	router := mux.NewRouter()
 
-	//TODO: Configure v1 & v2 APIs to work simultaneously
-	sqliteDatabase, _ := sql.Open("sqlite3", "./records.db") // Open the created SQLite File
-	defer sqliteDatabase.Close()                             // Defer Closing the database
-	//createTables(sqliteDatabase)                             // Create Database Tables
-	service := service.NewRepositoryRecordService(sqliteDatabase)
-	//service := service.NewInMemoryRecordService()
-	api := api.NewAPI(&service)
-	/*apiRoute := router.PathPrefix("/api/v1").Subrouter()
+	//TODO: Get properties from a config source
+	//TODO: Setup v1 & v2 APIs to work simultaneously
+	service1 := service.NewInMemoryRecordService()
+	api1 := api.NewAPI(&service1)
+	apiRoute := router.PathPrefix("/api/v1").Subrouter()
 	apiRoute.Path("/health").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		logError(err)
 	})
-	api.CreateRoutes(apiRoute)*/
+	api1.CreateRoutes(apiRoute)
 
+	sqliteDatabase, _ := sql.Open("sqlite3", "./records.db") // Open the created SQLite File
+	defer sqliteDatabase.Close()                             // Defer Closing the database
+	service2 := service.NewRepositoryRecordService(sqliteDatabase)
+	api2 := api.NewAPI(&service2)
 	apiRoute2 := router.PathPrefix("/api/v2").Subrouter()
 	apiRoute2.Path("/health").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		logError(err)
 	})
-	api.CreateRoutes2(apiRoute2)
+	api2.CreateRoutes2(apiRoute2)
 
 	address := "127.0.0.1:8000"
 	srv := &http.Server{

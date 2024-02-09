@@ -57,7 +57,6 @@ func NewInMemoryRecordService() InMemoryRecordService {
 
 func NewRepositoryRecordService(sqldb *sql.DB) RepositoryRecordService {
 	return RepositoryRecordService{
-		//repository: persistence.NewRecordRepository()
 		sqldb,
 	}
 }
@@ -72,7 +71,7 @@ func (s *InMemoryRecordService) GetRecord(ctx context.Context, id int) (entity.R
 	return record, nil
 }
 
-func (s *InMemoryRecordService) GetVersionedRecord(ctx context.Context, id int) (entity.Record, error) {
+func (s *InMemoryRecordService) GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error) {
 	return entity.Record{}, nil
 }
 
