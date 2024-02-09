@@ -9,8 +9,9 @@
       - id
       - createdAt
       - updatedAt
-- Each row of this table represents a Version of a row in the EntityInstance.
-- When the Record is first created, a corresponding Version row is also created
+- Each row of this table represents a Version of a row in the Record table.
+- When the Record is first created, a corresponding Version row is also created. 
+- So, if the system is in a correct state, we should have atleast one Version row for a given Record row
     - recordVersion
         - versionId
         - recordId
