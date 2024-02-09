@@ -69,3 +69,32 @@ func (a *API) PostRecords(w http.ResponseWriter, r *http.Request) {
 	err = writeJSON(w, record, http.StatusOK)
 	logError(err)
 }
+
+func (a *API) PostRecords2(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := mux.Vars(r)["id"]
+	idNumber, err := strconv.ParseInt(id, 10, 32)
+
+	if err != nil || idNumber <= 0 {
+		err := writeError(w, "invalid id; id must be a positive number", http.StatusBadRequest)
+		logError(err)
+		return
+	}
+
+	var body map[string]*string
+	err = json.NewDecoder(r.Body).Decode(&body)
+
+	if err != nil {
+		err := writeError(w, "invalid input; could not parse json", http.StatusBadRequest)
+		logError(err)
+		return
+	}
+
+	record, err := a.records.UpdateRecord(ctx, int(idNumber), body)
+	if err != nil {
+		logError(err)
+		return
+	}
+	err = writeJSON(w, record, http.StatusOK)
+	logError(err)
+}

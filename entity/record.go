@@ -1,8 +1,8 @@
 package entity
 
 type Record struct {
-	ID        int `json:"id"`
-	VersionID int64
+	ID        int               `json:"id"`
+	VersionID int64             `json:"versionId"`
 	Data      map[string]string `json:"data"`
 }
 

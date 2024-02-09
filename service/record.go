@@ -2,9 +2,15 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
+	"log"
+	"time"
 
 	"github.com/temelpa/timetravel/entity"
+	//"github.com/temelpa/timetravel/persistence"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var ErrRecordDoesNotExist = errors.New("record with that id does not exist")
@@ -16,6 +22,9 @@ type RecordService interface {
 
 	// GetRecord will retrieve an record.
 	GetRecord(ctx context.Context, id int) (entity.Record, error)
+
+	// GetRecord will retrieve an record.
+	GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error)
 
 	// CreateRecord will insert a new record.
 	//
@@ -34,9 +43,20 @@ type InMemoryRecordService struct {
 	data map[int]entity.Record
 }
 
+type RepositoryRecordService struct {
+	db *sql.DB
+}
+
 func NewInMemoryRecordService() InMemoryRecordService {
 	return InMemoryRecordService{
 		data: map[int]entity.Record{},
+	}
+}
+
+func NewRepositoryRecordService(sqldb *sql.DB) RepositoryRecordService {
+	return RepositoryRecordService{
+		//repository: persistence.NewRecordRepository()
+		sqldb,
 	}
 }
 
@@ -48,6 +68,10 @@ func (s *InMemoryRecordService) GetRecord(ctx context.Context, id int) (entity.R
 
 	record = record.Copy() // copy is necessary so modifations to the record don't change the stored record
 	return record, nil
+}
+
+func (s *InMemoryRecordService) GetVersionedRecord(ctx context.Context, id int) (entity.Record, error) {
+	return entity.Record{}, nil
 }
 
 func (s *InMemoryRecordService) CreateRecord(ctx context.Context, record entity.Record) error {
@@ -80,4 +104,151 @@ func (s *InMemoryRecordService) UpdateRecord(ctx context.Context, id int, update
 	}
 
 	return entry.Copy(), nil
+}
+
+func (s *RepositoryRecordService) GetRecord(ctx context.Context, id int) (entity.Record, error) {
+	return getLatestVersionForRecord(s.db, id)
+}
+
+func (s *RepositoryRecordService) GetVersionedRecord(ctx context.Context, id int, versionId int64) (entity.Record, error) {
+	return getSpecifiedVersionForRecord(s.db, id, versionId)
+}
+
+func (s *RepositoryRecordService) CreateRecord(ctx context.Context, record entity.Record) error {
+	//addRecordVersion(record.ID, record.Data)
+	return nil
+}
+
+func (s *RepositoryRecordService) UpdateRecord(ctx context.Context, id int, updates map[string]*string) (entity.Record, error) {
+	addRecordVersion(s.db, id, updates)
+	return getLatestVersionForRecord(s.db, id)
+}
+
+func getLatestVersionForRecord(db *sql.DB, id int) (entity.Record, error) {
+
+	var versionId int64
+	var record = entity.Record{}
+	record.ID = -1
+
+	if err := db.QueryRow("SELECT versionId FROM recordVersion where recordId = ? "+
+		"ORDER BY versionId DESC LIMIT 1", id).Scan(&versionId); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return record, fmt.Errorf("Record %d: not found", id)
+		}
+		return record, fmt.Errorf("Record %d: %v", id, err)
+	}
+	log.Println("Version Id: ", versionId, " Record Id: ", id)
+	record.ID = id
+	record.VersionID = versionId
+	rows, err := db.Query("SELECT key, value FROM recordVersionField WHERE fieldVersionId = ?", versionId)
+	if err != nil {
+		return record, err
+	}
+	defer rows.Close()
+	var props = map[string]string{}
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var key string
+		var value string
+		if err := rows.Scan(&key, &value); err != nil {
+			record.Data = props
+			return record, err
+		}
+		props[key] = value
+	}
+	record.Data = props
+	if err = rows.Err(); err != nil {
+		return record, err
+	}
+	return record, nil
+}
+
+func addRecordVersion(db *sql.DB, id int, body map[string]*string) {
+	log.Println("Inserting record version and field values ...")
+
+	now := time.Now()
+	updateMap := map[string]string{}
+	record, _ := getLatestVersionForRecord(db, id)
+	//New record
+	if record.ID == -1 {
+		insertRecordSQL := `INSERT INTO record(id, createdAt, updatedAt) VALUES (?, ?, ?)`
+		statement, err := db.Prepare(insertRecordSQL) // Prepare statement.
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		_, err = statement.Exec(id, now.Unix(), now.Unix())
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+	}
+	insertRecordVersionSQL := `INSERT INTO recordVersion(recordId) VALUES (?)`
+	statement, err := db.Prepare(insertRecordVersionSQL) // Prepare statement.
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	res, err := statement.Exec(id)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	versionId, err := res.LastInsertId()
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	record.ID = id
+	record.VersionID = versionId
+
+	//Get existing values of last version that are not part of current update request
+	for key, value := range record.Data {
+		if _, ok := body[key]; !ok {
+			updateMap[key] = value
+		}
+	}
+	for key, value := range body {
+		//Skip keys with null values
+		//If it existed in the last version, it has not been populated either.
+		if value != nil {
+			updateMap[key] = *value
+		}
+	}
+
+	for key, value := range updateMap {
+		insertRecordVersionFieldSQL := `INSERT INTO recordVersionField(fieldVersionId, key, value) VALUES (?, ?, ?)`
+		statement, err := db.Prepare(insertRecordVersionFieldSQL) // Prepare statement.
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		_, err = statement.Exec(record.VersionID, key, value)
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+	}
+}
+
+func getSpecifiedVersionForRecord(db *sql.DB, id int, versionId int64) (entity.Record, error) {
+	var record = entity.Record{}
+	record.ID = -1
+
+	record.ID = id
+	record.VersionID = versionId
+	rows, err := db.Query("SELECT key, value FROM recordVersionField WHERE fieldVersionId = ?", versionId)
+	if err != nil {
+		return record, err
+	}
+	defer rows.Close()
+	var props = map[string]string{}
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var key string
+		var value string
+		if err := rows.Scan(&key, &value); err != nil {
+			record.Data = props
+			return record, err
+		}
+		props[key] = value
+	}
+	record.Data = props
+	if err = rows.Err(); err != nil {
+		return record, err
+	}
+	return record, nil
 }
